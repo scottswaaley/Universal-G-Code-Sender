@@ -3,9 +3,9 @@
   <modelVersion>4.0.0</modelVersion>  
   <parent> 
     <groupId>com.willwinder</groupId>  
-    <artifactId>ugs-platform-parent</artifactId>  
-    <version>${revision}</version>
-  </parent>  
+    <artifactId>ugs-platform-parent</artifactId>
+    <version>${revision}${changelist}</version>
+  </parent>
 
   <artifactId>${artifactId}</artifactId>  
   <packaging>nbm</packaging>  
