@@ -457,9 +457,18 @@ public class BitZeroProbeService implements UGSEventListener {
         gcode("G4 P" + Utils.formatter.format(delay));
     }
 
-    /** Restore the distance mode + units the machine was in before the routine. */
+    /**
+     * Restore the distance mode + units the machine was in before the routine.
+     *
+     * Sent as a NON-temporary command (restoreParserState=false) on purpose: the
+     * temporary/restore path re-applies UGS's tracked modal state afterward, which
+     * comes from parsing GRBL's $G report and can be stale or empty -- that path
+     * could leave the controller in G91 while UGS still displays G90. A plain
+     * command is the definitive last word GRBL receives and also updates UGS's
+     * own parser tracking, so the state panel and the machine agree.
+     */
     private void restoreMotionState() throws Exception {
-        gcode(originalMotionState);
+        backend.sendGcodeCommand(false, originalMotionState);
     }
 
     private void liftZ(double distance) throws Exception {
