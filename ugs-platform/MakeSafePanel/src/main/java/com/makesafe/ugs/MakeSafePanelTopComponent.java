@@ -23,8 +23,13 @@ import com.willwinder.ugs.nbp.lib.services.LocalizingService;
 import static com.willwinder.ugs.nbp.lib.services.LocalizingService.lang;
 import com.willwinder.ugs.nbp.lib.services.TopComponentLocalizer;
 import com.willwinder.universalgcodesender.i18n.Localization;
+import com.willwinder.universalgcodesender.listeners.UGSEventListener;
 import com.willwinder.universalgcodesender.model.BackendAPI;
+import com.willwinder.universalgcodesender.model.UGSEvent;
 import com.willwinder.universalgcodesender.services.LookupService;
+import com.makesafe.ugs.bitzero.BitZeroPanel;
+import com.makesafe.ugs.bitzero.BitZeroProbeService;
+import javax.swing.JScrollPane;
 
 import org.netbeans.api.settings.ConvertAsProperties;
 import org.openide.awt.ActionID;
@@ -56,7 +61,7 @@ import org.openide.modules.OnStart;
         displayName = "MakeSafePanel",
         preferredID = "MakeSafePanelTopComponent"
 )
-public final class MakeSafePanelTopComponent extends TopComponent {
+public final class MakeSafePanelTopComponent extends TopComponent implements UGSEventListener {
   public final static String MakeSafePanelTitle = "MakeSafePanel"; //Localization.getString("platform.window.template-module", lang);
   public final static String MakeSafePanelTooltip = "MakeSafePanel tooltip"; //Localization.getString("platform.window.template-module.tooltip", lang);
   public final static String MakeSafePanelActionId = "com.makesafe.ugs.MakeSafePanelTopComponent";
@@ -70,23 +75,39 @@ public final class MakeSafePanelTopComponent extends TopComponent {
   }
 
   private final BackendAPI backend;
+  private final transient BitZeroProbeService probeService;
+  private final BitZeroPanel bitZeroPanel;
 
   public MakeSafePanelTopComponent() {
     setName(MakeSafePanelTitle);
     setToolTipText(MakeSafePanelTooltip);
 
     backend = LookupService.lookup(BackendAPI.class);
+    probeService = new BitZeroProbeService(backend);
+    bitZeroPanel = new BitZeroPanel(probeService);
 
     setLayout(new BorderLayout());
-    add(new JLabel("Hello MakeSafePanel!"), BorderLayout.CENTER);
+    add(new JScrollPane(bitZeroPanel), BorderLayout.CENTER);
   }
 
   @Override
   public void componentOpened() {
+    backend.addUGSEventListener(this);
+    updateControls();
   }
 
   @Override
   public void componentClosed() {
+    backend.removeUGSEventListener(this);
+  }
+
+  @Override
+  public void UGSEvent(UGSEvent event) {
+    updateControls();
+  }
+
+  private void updateControls() {
+    bitZeroPanel.setControlsEnabled(backend.isConnected() && backend.isIdle());
   }
 
   public void writeProperties(java.util.Properties p) {
