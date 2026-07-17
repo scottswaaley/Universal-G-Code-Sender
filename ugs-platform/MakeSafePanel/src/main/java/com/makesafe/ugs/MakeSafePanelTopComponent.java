@@ -26,6 +26,7 @@ import com.willwinder.universalgcodesender.i18n.Localization;
 import com.willwinder.universalgcodesender.listeners.UGSEventListener;
 import com.willwinder.universalgcodesender.model.BackendAPI;
 import com.willwinder.universalgcodesender.model.UGSEvent;
+import com.willwinder.universalgcodesender.model.events.ControllerStatusEvent;
 import com.willwinder.universalgcodesender.services.LookupService;
 import com.makesafe.ugs.bitzero.BitZeroPanel;
 import com.makesafe.ugs.bitzero.BitZeroProbeService;
@@ -84,7 +85,7 @@ public final class MakeSafePanelTopComponent extends TopComponent implements UGS
 
     backend = LookupService.lookup(BackendAPI.class);
     probeService = new BitZeroProbeService(backend);
-    bitZeroPanel = new BitZeroPanel(probeService);
+    bitZeroPanel = new BitZeroPanel(probeService, backend);
 
     setLayout(new BorderLayout());
     add(new JScrollPane(bitZeroPanel), BorderLayout.CENTER);
@@ -93,7 +94,7 @@ public final class MakeSafePanelTopComponent extends TopComponent implements UGS
   @Override
   public void componentOpened() {
     backend.addUGSEventListener(this);
-    updateControls();
+    bitZeroPanel.refresh();
   }
 
   @Override
@@ -103,11 +104,11 @@ public final class MakeSafePanelTopComponent extends TopComponent implements UGS
 
   @Override
   public void UGSEvent(UGSEvent event) {
-    updateControls();
-  }
-
-  private void updateControls() {
-    bitZeroPanel.setControlsEnabled(backend.isConnected() && backend.isIdle());
+    if (event instanceof ControllerStatusEvent) {
+      bitZeroPanel.setProbeContact(
+          ((ControllerStatusEvent) event).getStatus().getEnabledPins().probe());
+    }
+    bitZeroPanel.refresh();
   }
 
   public void writeProperties(java.util.Properties p) {

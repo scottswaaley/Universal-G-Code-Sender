@@ -18,6 +18,7 @@
  */
 package com.makesafe.ugs.bitzero;
 
+import com.willwinder.universalgcodesender.model.BackendAPI;
 import com.willwinder.universalgcodesender.model.UnitUtils.Units;
 import com.willwinder.universalgcodesender.model.WorkCoordinateSystem;
 
@@ -48,19 +49,26 @@ import java.util.function.DoubleConsumer;
  * calibratable geometry/speed settings.
  */
 public class BitZeroPanel extends JPanel {
+    private static final Color CONTACT_ON = new Color(0x1e, 0x9e, 0x3a);
+    private static final Color CONTACT_OFF = new Color(0x88, 0x88, 0x88);
+
     private final transient BitZeroProbeService service;
+    private final transient BackendAPI backend;
 
     private final JButton xyzButton = new JButton("Find XYZ Zero");
     private final JButton xButton = new JButton("X");
     private final JButton yButton = new JButton("Y");
     private final JButton zButton = new JButton("Z");
     private final JLabel statusLabel = new JLabel("Not connected.");
+    private final JLabel contactLabel = new JLabel("○  Probe contact: unknown");
 
-    public BitZeroPanel(BitZeroProbeService service) {
+    public BitZeroPanel(BitZeroProbeService service, BackendAPI backend) {
         this.service = service;
+        this.backend = backend;
         this.service.setStatusConsumer(this::onStatus);
+        this.service.setOnFinished(this::refresh);
         buildUi();
-        setControlsEnabled(false);
+        refresh();
     }
 
     private void buildUi() {
@@ -86,15 +94,27 @@ public class BitZeroPanel extends JPanel {
         // Probe buttons.
         c.gridy++;
         JPanel buttons = new JPanel(new GridLayout(1, 4, 6, 0));
-        xyzButton.addActionListener(e -> run("Find XYZ zero", service::findXYZ));
-        xButton.addActionListener(e -> run("Find X zero", service::findX));
-        yButton.addActionListener(e -> run("Find Y zero", service::findY));
-        zButton.addActionListener(e -> run("Find Z zero", service::findZ));
+        xyzButton.addActionListener(e -> run("Find XYZ zero",
+                "Jog the pin DOWN INTO the bore, roughly centered", service::findXYZ));
+        xButton.addActionListener(e -> run("Find X zero",
+                "Jog the pin INTO the bore (it will feel for both X walls)", service::findX));
+        yButton.addActionListener(e -> run("Find Y zero",
+                "Jog the pin INTO the bore (it will feel for both Y walls)", service::findY));
+        zButton.addActionListener(e -> run("Find Z zero",
+                "Jog the pin over the FLAT TOP face of the BitZero", service::findZ));
         buttons.add(xyzButton);
         buttons.add(xButton);
         buttons.add(yButton);
         buttons.add(zButton);
         add(buttons, c);
+
+        // Live probe-contact indicator: touch the pin to the BitZero and this
+        // lights up, confirming the ground clip and wiring before you probe.
+        c.gridy++;
+        contactLabel.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+        contactLabel.setToolTipText("Touch the pin to the BitZero — this should turn green if the "
+                + "ground clip and probe circuit are working.");
+        add(contactLabel, c);
 
         // Status line.
         c.gridy++;
@@ -197,22 +217,28 @@ public class BitZeroPanel extends JPanel {
     }
 
     /** Confirm (optionally) then start a probe routine, surfacing any error. */
-    private void run(String description, Runnable action) {
+    private void run(String description, String startHint, Runnable action) {
         if (BitZeroSettings.isRequireConfirmation()) {
             int choice = JOptionPane.showConfirmDialog(this,
-                    description + "?\n\nThe spindle will move toward the BitZero. Ensure the dowel pin is "
-                            + "installed, the ground clip is attached, and the pin is positioned over the bore.",
+                    description + "?\n\n"
+                            + "This probes FROM THE CURRENT PIN POSITION. It does NOT locate the BitZero "
+                            + "for you — you must jog there first.\n\n"
+                            + "Check before continuing:\n"
+                            + "  • Dowel pin installed in the spindle\n"
+                            + "  • Magnetic ground clip attached to the pin or collet\n"
+                            + "  • " + startHint + "\n\n"
+                            + "The spindle will then make slow probing moves from here.",
                     "MAKESafe BitZero", JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
             if (choice != JOptionPane.OK_OPTION) {
                 return;
             }
         }
         try {
-            setControlsEnabled(false);
+            disableButtons();
             action.run();
         } catch (RuntimeException e) {
             onStatus("Error: " + e.getMessage());
-            setControlsEnabled(true);
+            refresh();
         }
     }
 
@@ -220,17 +246,48 @@ public class BitZeroPanel extends JPanel {
         SwingUtilities.invokeLater(() -> statusLabel.setText(message));
     }
 
-    /**
-     * Enable or disable the probe buttons. Called as the controller connects and
-     * goes idle/busy. Settings remain editable regardless.
-     */
-    public void setControlsEnabled(boolean enabled) {
+    /** Update the live probe-contact indicator from the controller's pin state. */
+    public void setProbeContact(boolean contact) {
         SwingUtilities.invokeLater(() -> {
-            boolean canProbe = enabled && !service.isProbeCycleActive();
+            contactLabel.setText((contact ? "●  Probe contact: DETECTED" : "○  Probe contact: none"));
+            contactLabel.setForeground(contact ? CONTACT_ON : CONTACT_OFF);
+        });
+    }
+
+    private void disableButtons() {
+        SwingUtilities.invokeLater(() -> {
+            xyzButton.setEnabled(false);
+            xButton.setEnabled(false);
+            yButton.setEnabled(false);
+            zButton.setEnabled(false);
+        });
+    }
+
+    /**
+     * Re-evaluate button state and the idle status message from the live
+     * controller state. Buttons enable only while connected, idle, and not
+     * already probing. Settings remain editable regardless. Safe to call from
+     * any thread.
+     */
+    public void refresh() {
+        SwingUtilities.invokeLater(() -> {
+            boolean probing = service.isProbeCycleActive();
+            boolean connected = backend.isConnected();
+            boolean idle = backend.isIdle();
+            boolean canProbe = connected && idle && !probing;
             xyzButton.setEnabled(canProbe);
             xButton.setEnabled(canProbe);
             yButton.setEnabled(canProbe);
             zButton.setEnabled(canProbe);
+            if (!probing) {
+                if (!connected) {
+                    statusLabel.setText("Not connected — connect to your machine in UGS first.");
+                } else if (!idle) {
+                    statusLabel.setText("Machine busy — wait until idle.");
+                } else {
+                    statusLabel.setText("Ready. Jog the pin to the BitZero, then press a probe button.");
+                }
+            }
         });
     }
 }

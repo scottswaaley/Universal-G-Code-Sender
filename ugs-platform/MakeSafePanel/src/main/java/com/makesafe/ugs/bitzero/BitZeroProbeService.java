@@ -65,6 +65,7 @@ public class BitZeroProbeService implements UGSEventListener {
 
     private final BackendAPI backend;
     private Consumer<String> statusConsumer = m -> { };
+    private Runnable onFinished = () -> { };
 
     private final List<Position> probePositions = new ArrayList<>();
     private Operation currentOperation = Operation.NONE;
@@ -122,6 +123,11 @@ public class BitZeroProbeService implements UGSEventListener {
     /** Register a callback for human-readable progress/status messages. */
     public void setStatusConsumer(Consumer<String> statusConsumer) {
         this.statusConsumer = (statusConsumer != null) ? statusConsumer : m -> { };
+    }
+
+    /** Register a callback fired whenever a probe cycle finishes or aborts. */
+    public void setOnFinished(Runnable onFinished) {
+        this.onFinished = (onFinished != null) ? onFinished : () -> { };
     }
 
     public boolean isProbeCycleActive() {
@@ -189,6 +195,7 @@ public class BitZeroProbeService implements UGSEventListener {
         probePositions.clear();
         continuation = null;
         currentOperation = Operation.NONE;
+        onFinished.run();
     }
 
     // --- Z --------------------------------------------------------------------
