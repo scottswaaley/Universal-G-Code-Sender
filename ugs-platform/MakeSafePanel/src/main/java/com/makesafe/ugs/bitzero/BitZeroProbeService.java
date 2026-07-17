@@ -19,6 +19,7 @@
 package com.makesafe.ugs.bitzero;
 
 import com.willwinder.universalgcodesender.Utils;
+import com.willwinder.universalgcodesender.gcode.util.Code;
 import com.willwinder.universalgcodesender.gcode.util.GcodeUtils;
 import com.willwinder.universalgcodesender.listeners.ControllerState;
 import com.willwinder.universalgcodesender.listeners.UGSEventListener;
@@ -91,6 +92,9 @@ public class BitZeroProbeService implements UGSEventListener {
     private Position startPosition;
     private double midX;
     private double midY;
+    // The motion-mode (G90/G91) and units (G20/G21) the machine was in before
+    // the routine, restored on completion so probing leaves modal state as found.
+    private String originalMotionState = "G90 G21";
 
     @FunctionalInterface
     private interface Continuation {
@@ -186,6 +190,14 @@ public class BitZeroProbeService implements UGSEventListener {
         safeZ = BitZeroSettings.getSafeZClearance();
         startPosition = backend.getMachinePosition();
 
+        // Capture the current distance mode and units so we can put them back
+        // afterward. getCurrentGcodeState() is always populated (defaults G90/G21),
+        // unlike the framework's own restore which can be empty on a fresh connect.
+        Code distanceMode = backend.getController().getCurrentGcodeState().distanceMode;
+        Code unitsMode = backend.getController().getCurrentGcodeState().units;
+        originalMotionState = ((distanceMode == Code.G91) ? "G91" : "G90")
+                + " " + ((unitsMode == Code.G20) ? "G20" : "G21");
+
         probePositions.clear();
         continuation = null;
         currentOperation = operation;
@@ -220,6 +232,7 @@ public class BitZeroProbeService implements UGSEventListener {
                 case 3: {
                     Position contact = probePositions.get(1).getPositionIn(units);
                     setWcsMachine(null, null, contact.z - zThickness);
+                    restoreMotionState();
                     status("Z zero set (" + wcs + ").");
                     break;
                 }
@@ -274,6 +287,7 @@ public class BitZeroProbeService implements UGSEventListener {
                     } else {
                         setWcsMachine(null, corner, null);
                     }
+                    restoreMotionState();
                     status(axis + " zero set (" + wcs + ").");
                     break;
                 }
@@ -366,6 +380,7 @@ public class BitZeroProbeService implements UGSEventListener {
                     double cornerY = midY + cornerYSign * cornerYMag;
                     double zContact = probePositions.get(9).getPositionIn(units).z;
                     setWcsMachine(cornerX, cornerY, zContact - zThickness);
+                    restoreMotionState();
                     status("XYZ zero set (" + wcs + ").");
                     break;
                 }
@@ -440,6 +455,11 @@ public class BitZeroProbeService implements UGSEventListener {
 
     private void pause() throws Exception {
         gcode("G4 P" + Utils.formatter.format(delay));
+    }
+
+    /** Restore the distance mode + units the machine was in before the routine. */
+    private void restoreMotionState() throws Exception {
+        gcode(originalMotionState);
     }
 
     private void liftZ(double distance) throws Exception {

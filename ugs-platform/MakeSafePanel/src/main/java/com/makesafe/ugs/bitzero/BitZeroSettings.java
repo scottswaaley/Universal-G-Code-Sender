@@ -83,8 +83,9 @@ public final class BitZeroSettings {
     // Distance (magnitude) from the probed bore center to the stock corner along
     // each axis. The sign is supplied by the orientation. 0 zeroes at the bore
     // center itself, which is safe but not the corner.
+    // Default = 16.5mm, the BitZero v2 factory XY offset.
     public static double getBoreToCornerX() {
-        return prefs.getDouble(BORE_TO_CORNER_X, 0.0);
+        return prefs.getDouble(BORE_TO_CORNER_X, 16.5);
     }
 
     public static void setBoreToCornerX(double v) {
@@ -92,7 +93,7 @@ public final class BitZeroSettings {
     }
 
     public static double getBoreToCornerY() {
-        return prefs.getDouble(BORE_TO_CORNER_Y, 0.0);
+        return prefs.getDouble(BORE_TO_CORNER_Y, 16.5);
     }
 
     public static void setBoreToCornerY(double v) {
@@ -100,8 +101,9 @@ public final class BitZeroSettings {
     }
 
     // Distance from the probed BitZero top face down to the stock top surface.
+    // Default = 10mm, the BitZero v2 factory Z offset.
     public static double getZPlateThickness() {
-        return prefs.getDouble(Z_PLATE_THICKNESS, 15.0);
+        return prefs.getDouble(Z_PLATE_THICKNESS, 10.0);
     }
 
     public static void setZPlateThickness(double v) {
@@ -109,6 +111,8 @@ public final class BitZeroSettings {
     }
 
     // How far to drive toward each bore wall from the (roughly centered) start.
+    // Probing stops on contact, so this is a max search distance. 8mm suits the
+    // 10mm BitZero v2 bore (a 1/4" pin reaches a wall in ~2-4mm; 1/8" in ~4-7mm).
     public static double getXyProbeTravel() {
         return prefs.getDouble(XY_PROBE_TRAVEL, 8.0);
     }
