@@ -35,6 +35,7 @@ import org.openide.awt.ActionReference;
 import org.openide.modules.OnStart;
 import org.openide.windows.TopComponent;
 
+import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import java.awt.BorderLayout;
 
@@ -87,8 +88,15 @@ public final class ManualProbeTopComponent extends TopComponent implements UGSEv
     probeService = new ManualProbeService(backend);
     probePanel = new ManualProbePanel(probeService, backend);
 
+    // WEST, not CENTER: the panel keeps its own preferred width and the rest of
+    // the dock is left empty. Docked straight into CENTER it would be stretched
+    // to the full width of whatever mode it lands in, and the "output" dock is
+    // as wide as the window - which turns every button into a letterbox.
+    JPanel holder = new JPanel(new BorderLayout());
+    holder.add(probePanel, BorderLayout.WEST);
+
     setLayout(new BorderLayout());
-    add(new JScrollPane(probePanel), BorderLayout.CENTER);
+    add(new JScrollPane(holder), BorderLayout.CENTER);
   }
 
   @Override

@@ -72,6 +72,14 @@ public class ManualProbePanel extends JPanel {
 
     private static final String[] COLUMNS = {"Use", "#", "Along edge", "Contact", "Edge"};
 
+    /**
+     * Natural width of the panel contents. Rows still stretch to fill this,
+     * but the panel as a whole keeps this width however wide the dock is -
+     * the bottom "output" dock is full-screen wide, and without a cap every
+     * button inflates to match it.
+     */
+    private static final int CONTENT_WIDTH = 360;
+
     private final transient ManualProbeService service;
     private final transient BackendAPI backend;
 
@@ -145,13 +153,17 @@ public class ManualProbePanel extends JPanel {
         add(title, c);
 
         c.gridy++;
-        JLabel warn = new JLabel("<html><b>Set the tool diameter before trusting a zero.</b> "
+        // The explicit width matters: an unconstrained HTML label reports its
+        // preferred width as the whole string on one line, which would drag the
+        // panel as wide as the sentence and stretch every button with it.
+        JLabel warn = new JLabel("<html><div width='" + (CONTENT_WIDTH - 20) + "'>"
+                + "<b>Set the tool diameter before trusting a zero.</b> "
                 + "An XY probe touches with the <i>side</i> of the tool, so the edge is half a "
                 + "diameter past the contact point (a V-bit or ball nose is narrower than nominal "
                 + "at the contact height — measure it). Probing starts from wherever the tool "
                 + "is now and drives until it touches something. Keep the spindle off, and keep "
                 + "the whole length of the array clear of clamps: the tool steps along the edge "
-                + "at probing height, it does not lift over anything.</html>");
+                + "at probing height, it does not lift over anything.</div></html>");
         warn.setForeground(WARN_FG);
         add(warn, c);
 
